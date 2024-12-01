@@ -5,7 +5,6 @@ import matplotlib.patches as patches
 from random import uniform
 
 
-
 class QueueSimulation:
     def __init__(self, num_customers=30, interval=5, service_time_range=(5, 7)):
 
@@ -19,13 +18,16 @@ class QueueSimulation:
         self.current_time = 0
         self.served_customers = 0
         self.total_queue_time = 0 
+        self.total_waiting_time = 0  # Variable to accumulate total waiting time
         self.customers = []
+        self.queue_length_history = []  # To store the queue length over time
+        self.time_history = []  # To store the actual time for each queue length entry
         
         # Generate customers
         self.generate_customers()
         
         # Setup plot
-        self.fig, self.ax = plt.subplots(figsize=(12, 6))
+        self.fig, (self.ax, self.ax_queue) = plt.subplots(1, 2, figsize=(16, 6))
 
     def generate_customers(self):
 
@@ -53,12 +55,16 @@ class QueueSimulation:
         self.ax.add_patch(service_box)
         self.ax.text(8.5, 5.5, f'Service Box: {self.served_customers}/{self.num_customers}', ha='center', fontweight='bold')
         
-        # Average Queue Length
-        self.avg_queue_len = self.total_queue_time / self.current_time if self.current_time > 0 else 0
-        self.ax.text(6, 5.5, f'Avg Queue Length: {self.avg_queue_len:.2f}', ha='center')
 
         # Display time
         self.ax.text(6, 0.5, f'Time: {self.current_time:.2f}', ha='center')
+
+        # Average Queue Length
+        self.avg_queue_len = self.total_queue_time / self.current_time if self.current_time > 0 else 0
+        # Average Waiting Time
+        avg_waiting_time = self.total_waiting_time / self.served_customers if self.served_customers > 0 else 0
+        
+        self.ax.set_title(f'Avg Queue Length: {self.avg_queue_len:.2f}\nAvg Waiting Time: {avg_waiting_time:.2f}', ha='center')
 
     def process_customers(self):
 
@@ -88,6 +94,10 @@ class QueueSimulation:
             
             if customer['status'] == 'in_service':
                 if self.current_time >= customer['service_start_time'] + customer['service_time']:
+                    # Calculate waiting time for this customer and accumulate it
+                    waiting_time = (self.current_time - customer['arrival_time'] - customer['service_time'])
+                    self.total_waiting_time += waiting_time
+                    
                     customer['status'] = 'completed'
                     self.service_queue.remove(customer)
                     self.completed_customers.append(customer)
@@ -111,6 +121,20 @@ class QueueSimulation:
             customer['pos_x'] += 0.2
             self.ax.plot(customer['pos_x'], customer['pos_y'], 'go', markersize=8) 
 
+    def update_queue_graph(self):
+
+        # Add current time and queue length to history
+        self.queue_length_history.append(len(self.queue))
+        self.time_history.append(self.current_time)
+
+        # Update the queue length graph
+        self.ax_queue.clear()
+        self.ax_queue.plot(self.time_history, self.queue_length_history, color='b', label="Queue Length")
+        self.ax_queue.set_title("Queue Length Over Time")
+        self.ax_queue.set_xlabel("Time")
+        self.ax_queue.set_ylabel("Queue Length")
+        self.ax_queue.legend(loc="upper right")
+
     def animate(self, frame):
 
         self.current_time += 0.05  # Increment simulation time
@@ -118,11 +142,13 @@ class QueueSimulation:
         self.process_customers()
         self.setup_plot()
         self.visualize_customers()
+        self.update_queue_graph()
         
         # End simulation when all customers are served
         if self.served_customers >= self.num_customers:
             print("All customers served.")
             print(f"Average Queue length = {self.avg_queue_len}")
+            print(f"Average Waiting Time = {self.total_waiting_time / self.served_customers:.2f}")
             plt.close(self.fig)
 
     def run_simulation(self):
